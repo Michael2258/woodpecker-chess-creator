@@ -18,6 +18,8 @@ npm run build   # type-check and build for production
 - `src/model/` – data types (sets, puzzles, cycles) and cycle summaries
 - `src/chess/` – puzzle parsing (FEN/PGN) and move checking, built on chess.js
 - `src/storage/` – browser database (Dexie) and the repository the UI uses
+- `src/pages/`, `src/components/` – screens (sets, set detail, puzzle editor) and the board components
+- `src/router.ts` – hash-based routes, so links and refreshes work on any static host
 
 ## Deployment
 

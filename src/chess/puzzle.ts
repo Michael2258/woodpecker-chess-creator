@@ -115,3 +115,25 @@ export function checkSolverMove(
     solved: nextPly >= solution.length || chess.isCheckmate(),
   }
 }
+
+/** Position after playing `moves` (SAN) from `fen`. */
+export function fenAfter(fen: string, moves: string[]): string {
+  const chess = new Chess(fen)
+  for (const m of moves) chess.move(m)
+  return chess.fen()
+}
+
+/** Formats a line with move numbers, e.g. "23... Rd1+ 24. Rxd1 Qxd1#". */
+export function formatLine(fen: string, moves: string[]): string {
+  const [, turn, , , , full] = fen.split(' ')
+  let moveNo = Number(full) || 1
+  let white = turn !== 'b'
+  const parts: string[] = []
+  moves.forEach((san, i) => {
+    if (white) parts.push(`${moveNo}. ${san}`)
+    else parts.push(i === 0 ? `${moveNo}... ${san}` : san)
+    if (!white) moveNo++
+    white = !white
+  })
+  return parts.join(' ')
+}
