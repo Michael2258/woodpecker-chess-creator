@@ -23,3 +23,12 @@ export function nextPuzzleInCycle(cycle: Cycle, puzzles: Puzzle[]): Puzzle | nul
 export function isCycleFinished(cycle: Cycle, puzzles: Puzzle[]): boolean {
   return puzzles.length > 0 && nextPuzzleInCycle(cycle, puzzles) === null
 }
+
+/** "0:42", "12:05", "1:02:09". */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const sec = String(total % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
+}

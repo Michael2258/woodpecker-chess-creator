@@ -80,10 +80,22 @@ describe('repository', () => {
 
     const c2 = await repo.startCycle(set.id)
     expect(c2.number).toBe(2)
+    // Starting again while a cycle is open resumes it instead of making a new one.
+    expect((await repo.startCycle(set.id)).id).toBe(c2.id)
+    expect((await repo.currentCycle(set.id))?.id).toBe(c2.id)
     expect((await repo.listCycles(set.id)).map((x) => x.number)).toEqual([1, 2])
 
     await repo.deleteSet(set.id)
     expect(await repo.listCycles(set.id)).toEqual([])
     expect(await repo.listPuzzles(set.id)).toEqual([])
+  })
+
+  it('abandons a cycle and numbers the next one after the last kept cycle', async () => {
+    const set = await repo.createSet('S')
+    await repo.addPuzzle(set.id, { fen: FEN, solution: ['Qxf7#'] })
+    const c1 = await repo.startCycle(set.id)
+    await repo.deleteCycle(c1.id)
+    expect(await repo.currentCycle(set.id)).toBeUndefined()
+    expect((await repo.startCycle(set.id)).number).toBe(1)
   })
 })

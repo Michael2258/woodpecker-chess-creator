@@ -41,7 +41,17 @@ type Mode = 'position' | 'solution'
 
 function Editor({ setId, setName, puzzle }: { setId: string; setName: string; puzzle: Puzzle | null }) {
   const [mode, setMode] = useState<Mode>(puzzle ? 'solution' : 'position')
-  const [placement, setPlacement] = useState<Placement>(() => placementFromFen(puzzle?.fen ?? START_FEN))
+  const [placement, setPlacementRaw] = useState<Placement>(() => placementFromFen(puzzle?.fen ?? START_FEN))
+  const [history, setHistory] = useState<Placement[]>([])
+  function setPlacement(next: Placement) {
+    setHistory((h) => [...h.slice(-99), placement])
+    setPlacementRaw(next)
+  }
+  function undoPlacement() {
+    if (!history.length) return
+    setPlacementRaw(history[history.length - 1])
+    setHistory(history.slice(0, -1))
+  }
   const [turn, setTurn] = useState<'w' | 'b'>(() => ((puzzle?.fen ?? START_FEN).split(' ')[1] as 'w' | 'b'))
   const [startFen, setStartFen] = useState<string | null>(puzzle?.fen ?? null)
   const [solution, setSolution] = useState<string[]>(puzzle?.solution ?? [])
@@ -153,7 +163,15 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
       <div className="editor-layout">
         <div className="editor-board">
           {mode === 'position' ? (
-            <PositionEditor key={resetKey} placement={placement} onChange={setPlacement} turn={turn} onTurnChange={setTurn} />
+            <PositionEditor
+              key={resetKey}
+              placement={placement}
+              onChange={setPlacement}
+              turn={turn}
+              onTurnChange={setTurn}
+              onUndo={undoPlacement}
+              canUndo={history.length > 0}
+            />
           ) : (
             currentFen && (
               <PlayBoard
@@ -164,6 +182,16 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
                 lastMove={lastMove}
               />
             )
+          )}
+          {mode === 'solution' && (
+            <div className="row wrap board-actions">
+              <button className="secondary" onClick={() => setSolution(solution.slice(0, -1))} disabled={!solution.length}>
+                ↶ Undo move
+              </button>
+              <button className="secondary" onClick={() => setSolution([])} disabled={!solution.length}>
+                Clear moves
+              </button>
+            </div>
           )}
         </div>
 
@@ -198,14 +226,6 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
                 <p className="line" aria-live="polite">
                   {solution.length ? formatLine(startFen!, solution) : <span className="muted">No moves yet.</span>}
                 </p>
-                <div className="row wrap">
-                  <button className="secondary" onClick={() => setSolution(solution.slice(0, -1))} disabled={!solution.length}>
-                    Undo move
-                  </button>
-                  <button className="secondary" onClick={() => setSolution([])} disabled={!solution.length}>
-                    Clear moves
-                  </button>
-                </div>
               </section>
 
               <section className="card stack">

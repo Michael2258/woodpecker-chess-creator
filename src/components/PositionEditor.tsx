@@ -7,6 +7,8 @@ interface Props {
   onChange: (placement: Placement) => void
   turn: 'w' | 'b'
   onTurnChange: (turn: 'w' | 'b') => void
+  onUndo: () => void
+  canUndo: boolean
 }
 
 const PIECE_NAMES: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight', P: 'pawn' }
@@ -16,7 +18,7 @@ const PIECE_NAMES: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', 
  * place it, tap with the eraser to clear, or drag pieces around (drag one off
  * the board to remove it).
  */
-export function PositionEditor({ placement, onChange, turn, onTurnChange }: Props) {
+export function PositionEditor({ placement, onChange, turn, onTurnChange, onUndo, canUndo }: Props) {
   const [tool, setTool] = useState<string>('move')
   const [flipped, setFlipped] = useState(false)
 
@@ -92,6 +94,9 @@ export function PositionEditor({ placement, onChange, turn, onTurnChange }: Prop
             Black to move
           </button>
         </div>
+        <button className="secondary" onClick={onUndo} disabled={!canUndo}>
+          ↶ Undo
+        </button>
         <button className="secondary" onClick={() => onChange(placementFromFen(START_FEN))}>
           Start position
         </button>
