@@ -18,3 +18,8 @@ npm run build   # type-check and build for production
 - `src/model/` – data types (sets, puzzles, cycles) and cycle summaries
 - `src/chess/` – puzzle parsing (FEN/PGN) and move checking, built on chess.js
 - `src/storage/` – browser database (Dexie) and the repository the UI uses
+
+## Deployment
+
+Every push to `main` runs the tests, builds the app and publishes it to GitHub Pages at
+https://michael2258.github.io/woodpecker-chess-creator/ (see `.github/workflows/deploy.yml`).
