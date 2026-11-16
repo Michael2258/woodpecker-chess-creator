@@ -115,9 +115,28 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
       return db.cycles.where('[setId+number]').between([setId, Dexie.minKey], [setId, Dexie.maxKey]).toArray()
     },
 
+    async getCycle(id: Id): Promise<Cycle | undefined> {
+      return db.cycles.get(id)
+    },
+
+    /** The most recent cycle that hasn't been finished yet, if any. */
+    async currentCycle(setId: Id): Promise<Cycle | undefined> {
+      const cycles = await this.listCycles(setId)
+      const last = cycles[cycles.length - 1]
+      return last && last.completedAt === null ? last : undefined
+    },
+
+    /** Abandons a cycle and its results. */
+    async deleteCycle(id: Id) {
+      await db.cycles.delete(id)
+    },
+
     async startCycle(setId: Id): Promise<Cycle> {
       return db.transaction('rw', db.cycles, async () => {
-        const count = await db.cycles.where('setId').equals(setId).count()
+        const cycles = await db.cycles.where('setId').equals(setId).toArray()
+        const unfinished = cycles.find((c) => c.completedAt === null)
+        if (unfinished) return unfinished
+        const count = Math.max(0, ...cycles.map((c) => c.number))
         const cycle: Cycle = {
           id: newId(),
           setId,

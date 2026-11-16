@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isCycleFinished, nextPuzzleInCycle, summarizeCycle } from './cycles'
+import { formatDuration, isCycleFinished, nextPuzzleInCycle, summarizeCycle } from './cycles'
 import type { Cycle, Puzzle } from './types'
 
 const puzzle = (id: string, order: number): Puzzle => ({
@@ -34,5 +34,11 @@ describe('cycles', () => {
     expect(isCycleFinished(cycle(all), puzzles)).toBe(true)
     expect(isCycleFinished(cycle([]), puzzles)).toBe(false)
     expect(isCycleFinished(cycle([]), [])).toBe(false)
+  })
+  it('formats durations', () => {
+    expect(formatDuration(0)).toBe('0:00')
+    expect(formatDuration(42_400)).toBe('0:42')
+    expect(formatDuration(725_000)).toBe('12:05')
+    expect(formatDuration(3_729_000)).toBe('1:02:09')
   })
 })

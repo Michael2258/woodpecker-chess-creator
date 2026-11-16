@@ -1,6 +1,7 @@
 import { HomePage } from './pages/HomePage'
 import { PuzzleEditorPage } from './pages/PuzzleEditorPage'
 import { SetPage } from './pages/SetPage'
+import { SolvePage } from './pages/SolvePage'
 import { paths, useRoute } from './router'
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
       <main>
         {route.name === 'home' && <HomePage />}
         {route.name === 'set' && <SetPage setId={route.setId} />}
+        {route.name === 'solve' && <SolvePage setId={route.setId} />}
         {route.name === 'newPuzzle' && <PuzzleEditorPage setId={route.setId} />}
         {route.name === 'editPuzzle' && <PuzzleEditorPage setId={route.setId} puzzleId={route.puzzleId} />}
         {route.name === 'notFound' && (

@@ -1,13 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState, type FormEvent } from 'react'
 import { formatLine, solverColor } from '../chess/puzzle'
-import type { Puzzle, PuzzleSet } from '../model/types'
+import { displayTitle } from '../model/display'
+import type { Cycle, Puzzle, PuzzleSet } from '../model/types'
+import { CycleHistory } from '../components/CycleHistory'
 import { repo } from '../repo'
 import { navigate, paths } from '../router'
 
 export function SetPage({ setId }: { setId: string }) {
   const data = useLiveQuery(
-    async () => ({ set: await repo.getSet(setId), puzzles: await repo.listPuzzles(setId) }),
+    async () => ({
+      set: await repo.getSet(setId),
+      puzzles: await repo.listPuzzles(setId),
+      cycles: await repo.listCycles(setId),
+    }),
     [setId],
   )
 
@@ -22,10 +28,10 @@ export function SetPage({ setId }: { setId: string }) {
       </section>
     )
   }
-  return <SetView set={data.set} puzzles={data.puzzles} />
+  return <SetView set={data.set} puzzles={data.puzzles} cycles={data.cycles} />
 }
 
-function SetView({ set, puzzles }: { set: PuzzleSet; puzzles: Puzzle[] }) {
+function SetView({ set, puzzles, cycles }: { set: PuzzleSet; puzzles: Puzzle[]; cycles: Cycle[] }) {
   const [editing, setEditing] = useState(false)
 
   async function move(index: number, delta: number) {
@@ -69,12 +75,14 @@ function SetView({ set, puzzles }: { set: PuzzleSet; puzzles: Puzzle[] }) {
               <button className="secondary" onClick={() => setEditing(true)}>
                 Rename
               </button>
-              <a className="button" href={paths.newPuzzle(set.id)}>
+              <a className="button secondary-link" href={paths.newPuzzle(set.id)}>
                 Add puzzle
               </a>
-              <button disabled title="Solve mode is coming in the next step">
-                Start solving
-              </button>
+              {puzzles.length > 0 && (
+                <a className="button" href={paths.solve(set.id)}>
+                  {solveLabel(cycles, puzzles.length)}
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -119,6 +127,8 @@ function SetView({ set, puzzles }: { set: PuzzleSet; puzzles: Puzzle[] }) {
           ))}
         </ol>
       )}
+
+      <CycleHistory cycles={cycles} />
 
       <section className="danger-zone">
         <button className="ghost danger" onClick={deleteSet}>
@@ -165,8 +175,9 @@ function SetDetailsForm({ set, onDone }: { set: PuzzleSet; onDone: () => void })
   )
 }
 
-/** "12" reads better as "#12"; an empty title falls back to the position in the set. */
-function displayTitle(title: string, n: number): string {
-  if (!title) return `Puzzle ${n}`
-  return /^\d+$/.test(title) ? `#${title}` : title
+function solveLabel(cycles: Cycle[], total: number): string {
+  const open = cycles.find((c) => c.completedAt === null)
+  if (open) return `Continue cycle ${open.number} (${open.attempts.length}/${total})`
+  if (cycles.length === 0) return 'Start solving'
+  return `Start cycle ${Math.max(...cycles.map((c) => c.number)) + 1}`
 }

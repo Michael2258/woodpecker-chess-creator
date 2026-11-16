@@ -1,5 +1,5 @@
 import { Chess, type Square } from 'chess.js'
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Chessboard, defaultPieces } from 'react-chessboard'
 import type { Color } from '../chess/puzzle'
 
@@ -33,6 +33,8 @@ export function PlayBoard({ fen, orientation, onMove, movable, lastMove, id = 'p
   const canMove = movable === 'none' ? false : (movable ?? (turn === 'w' ? 'white' : 'black')) === (turn === 'w' ? 'white' : 'black')
 
   const [selected, setSelected] = useState<{ fen: string; square: string } | null>(null)
+  // A drag selects a piece too; a click right after it should keep it selected.
+  const selectedByClick = useRef(false)
   const [promotion, setPromotion] = useState<{ fen: string; from: string; to: string } | null>(null)
   // Selections belong to a position; drop them when the position changes.
   const activeSelection = selected?.fen === fen ? selected.square : null
@@ -90,18 +92,27 @@ export function PlayBoard({ fen, orientation, onMove, movable, lastMove, id = 'p
           boardOrientation: orientation,
           allowDragging: canMove,
           canDragPiece: ({ piece }) => canMove && piece.pieceType[0] === turn,
+          // Show the moves for a piece as soon as it's picked up, too.
+          onPieceDrag: ({ square }) => {
+            if (canMove && square && ownPiece(square)) {
+              selectedByClick.current = false
+              setSelected({ fen, square })
+            }
+          },
           onPieceDrop: ({ sourceSquare, targetSquare }) =>
             targetSquare ? tryMove(sourceSquare, targetSquare) : false,
           onSquareClick: ({ square }) => {
             if (!canMove) return
             if (activeSelection && targets.includes(square)) {
               tryMove(activeSelection, square)
-            } else if (ownPiece(square) && square !== activeSelection) {
+            } else if (ownPiece(square) && (square !== activeSelection || !selectedByClick.current)) {
+              selectedByClick.current = true
               setSelected({ fen, square })
             } else {
               setSelected(null)
             }
           },
+          onPieceDragCancel: () => setSelected(null),
           squareStyles,
           animationDurationInMs: 150,
         }}

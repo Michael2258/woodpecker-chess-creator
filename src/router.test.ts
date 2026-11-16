@@ -8,6 +8,7 @@ describe('parseRoute', () => {
     expect(parseRoute(paths.set('a b'))).toEqual({ name: 'set', setId: 'a b' })
     expect(parseRoute(paths.newPuzzle('s1'))).toEqual({ name: 'newPuzzle', setId: 's1' })
     expect(parseRoute(paths.editPuzzle('s1', 'p1'))).toEqual({ name: 'editPuzzle', setId: 's1', puzzleId: 'p1' })
+    expect(parseRoute(paths.solve('s1'))).toEqual({ name: 'solve', setId: 's1' })
     expect(parseRoute('#/nope')).toEqual({ name: 'notFound' })
   })
 })
