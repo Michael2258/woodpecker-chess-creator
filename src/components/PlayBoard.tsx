@@ -36,6 +36,11 @@ export function PlayBoard({ fen, orientation, onMove, movable, lastMove, id = 'p
   // A drag selects a piece too; a click right after it should keep it selected.
   const selectedByClick = useRef(false)
   const [promotion, setPromotion] = useState<{ fen: string; from: string; to: string } | null>(null)
+  // Squares marked with a right click, for thinking out loud. Cleared by a
+  // left click or when the position changes. Right-drag draws arrows.
+  const [marks, setMarks] = useState<{ fen: string; squares: string[] }>({ fen, squares: [] })
+  const marked = marks.fen === fen ? marks.squares : []
+  const rightDown = useRef<string | null>(null)
   // Selections belong to a position; drop them when the position changes.
   const activeSelection = selected?.fen === fen ? selected.square : null
   const pendingPromotion = promotion?.fen === fen ? promotion : null
@@ -71,6 +76,9 @@ export function PlayBoard({ fen, orientation, onMove, movable, lastMove, id = 'p
     squareStyles[lastMove.from] = { background: 'rgba(255, 214, 0, 0.35)' }
     squareStyles[lastMove.to] = { background: 'rgba(255, 214, 0, 0.45)' }
   }
+  for (const m of marked) {
+    squareStyles[m] = { ...squareStyles[m], boxShadow: 'inset 0 0 0 999px rgba(235, 97, 80, 0.75)' }
+  }
   if (activeSelection) squareStyles[activeSelection] = { background: 'rgba(47, 107, 79, 0.55)' }
   for (const t of targets) {
     squareStyles[t] = {
@@ -101,7 +109,24 @@ export function PlayBoard({ fen, orientation, onMove, movable, lastMove, id = 'p
           },
           onPieceDrop: ({ sourceSquare, targetSquare }) =>
             targetSquare ? tryMove(sourceSquare, targetSquare) : false,
+          // Mark on a right press and release over the same square. A right
+          // drag to another square draws an arrow instead. (The browser's
+          // context-menu event can't tell the two apart on every OS.)
+          onSquareMouseDown: ({ square }, e) => {
+            if (e.button === 2) rightDown.current = square
+          },
+          onSquareMouseUp: ({ square }, e) => {
+            if (e.button !== 2) return
+            if (rightDown.current === square) {
+              setMarks({
+                fen,
+                squares: marked.includes(square) ? marked.filter((m) => m !== square) : [...marked, square],
+              })
+            }
+            rightDown.current = null
+          },
           onSquareClick: ({ square }) => {
+            if (marked.length) setMarks({ fen, squares: [] })
             if (!canMove) return
             if (activeSelection && targets.includes(square)) {
               tryMove(activeSelection, square)
