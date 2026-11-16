@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { checkSolverMove, normalizeSolution, parsePuzzleInput, solverColor } from './puzzle'
+import {
+  checkSolverMove,
+  fenAfter,
+  formatLine,
+  normalizeSolution,
+  parsePuzzleInput,
+  solverColor,
+} from './puzzle'
 
 // White to move: Qxf7# (Scholar's mate pattern).
 const SCHOLAR = 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4'
@@ -73,5 +80,17 @@ describe('checkSolverMove', () => {
     // Qxf7# mates, but the stored line lists a different first move.
     const r = checkSolverMove(SCHOLAR, ['Bxf7+'], 0, { from: 'h5', to: 'f7' })
     expect(r).toMatchObject({ result: 'correct', solved: true })
+  })
+})
+
+describe('formatLine and fenAfter', () => {
+  it('numbers moves from the position, including black to move', () => {
+    expect(formatLine(BACK_RANK, ['Rd1', 'Rxd1'])).toBe('1... Rd1 2. Rxd1')
+    expect(formatLine(SCHOLAR, ['Qxf7#'])).toBe('4. Qxf7#')
+    expect(formatLine(SCHOLAR, [])).toBe('')
+  })
+
+  it('plays a line forward', () => {
+    expect(fenAfter(BACK_RANK, ['Rd1']).split(' ')[0]).toBe('6k1/5ppp/8/8/8/8/5PPP/3rR1K1')
   })
 })
