@@ -21,5 +21,6 @@ npm run build   # type-check and build for production
 
 ## Deployment
 
-Every push to `main` runs the tests, builds the app and publishes it to GitHub Pages at
-https://michael2258.github.io/woodpecker-chess-creator/ (see `.github/workflows/deploy.yml`).
+The app is hosted on Vercel, linked to this repository. Every push to `main` deploys to production,
+and every pull request gets its own preview URL. Vercel detects the Vite setup automatically
+(build command `npm run build`, output folder `dist`).
