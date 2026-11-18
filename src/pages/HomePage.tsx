@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState, type FormEvent } from 'react'
+import { MarkdownImport } from '../components/MarkdownImport'
 import { repo } from '../repo'
 import { navigate, paths } from '../router'
 
@@ -40,6 +41,9 @@ export function HomePage() {
           <button type="submit">Create set</button>
         </form>
         {error && <p className="error">{error}</p>}
+        <div className="import-block">
+          <MarkdownImport target={{ kind: 'newSet' }} label="Or import a set from a .md file" />
+        </div>
       </section>
 
       <h2 className="section-title">Your sets</h2>

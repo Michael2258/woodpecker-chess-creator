@@ -72,6 +72,41 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
       })
     },
 
+    /**
+     * Adds several puzzles to the end of a set in one go. Every puzzle is
+     * checked first, so nothing is added if any of them is invalid.
+     */
+    async addPuzzles(
+      setId: Id,
+      inputs: { fen: string; solution: string[]; title?: string; note?: string }[],
+    ): Promise<Puzzle[]> {
+      const checked = inputs.map((input, i) => {
+        const parsed = normalizeSolution(input.fen, input.solution)
+        const label = input.title?.trim() || `Puzzle ${i + 1}`
+        if (!parsed.ok) throw new Error(`${label}: ${parsed.error}`)
+        if (parsed.puzzle.solution.length === 0) throw new Error(`${label}: a puzzle needs at least one solution move.`)
+        return { input, parsed: parsed.puzzle }
+      })
+      const t = now()
+      return db.transaction('rw', db.sets, db.puzzles, async () => {
+        const start = await db.puzzles.where('setId').equals(setId).count()
+        const puzzles: Puzzle[] = checked.map(({ input, parsed }, i) => ({
+          id: newId(),
+          setId,
+          order: start + i,
+          title: input.title?.trim() ?? '',
+          fen: parsed.fen,
+          solution: parsed.solution,
+          note: input.note ?? '',
+          createdAt: t,
+          updatedAt: t,
+        }))
+        await db.puzzles.bulkAdd(puzzles)
+        await db.sets.update(setId, { updatedAt: t })
+        return puzzles
+      })
+    },
+
     async updatePuzzle(
       id: Id,
       changes: Partial<Pick<Puzzle, 'fen' | 'solution' | 'title' | 'note'>>,

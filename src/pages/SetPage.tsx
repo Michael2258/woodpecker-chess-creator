@@ -4,6 +4,7 @@ import { formatLine, solverColor } from '../chess/puzzle'
 import { displayTitle } from '../model/display'
 import type { Cycle, Puzzle, PuzzleSet } from '../model/types'
 import { CycleHistory } from '../components/CycleHistory'
+import { MarkdownImport } from '../components/MarkdownImport'
 import { repo } from '../repo'
 import { navigate, paths } from '../router'
 
@@ -84,6 +85,11 @@ function SetView({ set, puzzles, cycles }: { set: PuzzleSet; puzzles: Puzzle[]; 
                 </a>
               )}
             </div>
+          </div>
+        )}
+        {!editing && (
+          <div className="import-block">
+            <MarkdownImport target={{ kind: 'set', setId: set.id }} label="Import puzzles from a .md file" />
           </div>
         )}
       </section>
