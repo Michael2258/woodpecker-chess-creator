@@ -1,9 +1,10 @@
 import { Chess } from 'chess.js'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CycleHistory } from '../components/CycleHistory'
 import { PlayBoard, type BoardMove } from '../components/PlayBoard'
-import { checkSolverMove, formatLine, solverColor } from '../chess/puzzle'
+import { SolutionStepper } from '../components/SolutionStepper'
+import { checkSolverMove, formatLine, linePlies, solverColor } from '../chess/puzzle'
 import { formatDuration, nextPuzzleInCycle, summarizeCycle } from '../model/cycles'
 import { displayTitle } from '../model/display'
 import type { Cycle, Puzzle, PuzzleSet } from '../model/types'
@@ -194,7 +195,9 @@ function PuzzleRun({
   const [busy, setBusy] = useState(false)
   const [wrong, setWrong] = useState<{ played: string; expected: string } | null>(null)
   const [timeMs, setTimeMs] = useState(0)
-  const [showingSolution, setShowingSolution] = useState(false)
+  // When the solution is shown, how many of its moves are played on the board.
+  const [solutionPly, setSolutionPly] = useState<number | null>(null)
+  const plies = useMemo(() => linePlies(puzzle.fen, puzzle.solution), [puzzle.fen, puzzle.solution])
   const [startedAt] = useState(() => Date.now())
   const [now, setNow] = useState(startedAt)
   const timers = useRef<number[]>([])
@@ -256,18 +259,13 @@ function PuzzleRun({
   }
 
   function showSolution() {
-    setShowingSolution(true)
-    const chess = new Chess(puzzle.fen)
-    setFen(puzzle.fen)
-    setLastMove(null)
-    puzzle.solution.forEach((san, i) => {
-      later(() => {
-        const m = chess.move(san)
-        setFen(chess.fen())
-        setLastMove({ from: m.from, to: m.to })
-      }, 600 * (i + 1))
-    })
+    // Start from the puzzle position; the solver steps through the moves.
+    setSolutionPly(0)
   }
+
+  const shownPly = solutionPly === null ? null : plies[solutionPly - 1]
+  const boardFen = solutionPly === null ? fen : (shownPly?.fen ?? puzzle.fen)
+  const boardLastMove = solutionPly === null ? lastMove : shownPly ? { from: shownPly.from, to: shownPly.to } : null
 
   const shownTime = status === 'solving' ? now - startedAt : timeMs
 
@@ -276,11 +274,11 @@ function PuzzleRun({
       <div className="editor-board">
         <PlayBoard
           id="solve"
-          fen={fen}
+          fen={boardFen}
           orientation={color}
           onMove={onMove}
           movable={status === 'solving' && !busy ? color : 'none'}
-          lastMove={lastMove}
+          lastMove={boardLastMove}
         />
       </div>
 
@@ -304,8 +302,8 @@ function PuzzleRun({
               <p className="result bad">
                 ✗ {wrong ? `${wrong.played} isn't it. The move was ${wrong.expected}.` : 'Missed.'}
               </p>
-              {showingSolution ? (
-                <p className="line">{formatLine(puzzle.fen, puzzle.solution)}</p>
+              {solutionPly !== null ? (
+                <SolutionStepper plies={plies} ply={solutionPly} onChange={setSolutionPly} />
               ) : (
                 <div>
                   <button className="secondary" onClick={showSolution}>

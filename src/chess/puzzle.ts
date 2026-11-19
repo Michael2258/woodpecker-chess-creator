@@ -137,3 +137,28 @@ export function formatLine(fen: string, moves: string[]): string {
   })
   return parts.join(' ')
 }
+
+export interface LinePly {
+  san: string
+  /** Move number prefix to show before this move: "23.", "23..." or "". */
+  label: string
+  from: string
+  to: string
+  /** Position after this move. */
+  fen: string
+}
+
+/** Each move of a line with its number label, squares and resulting position. */
+export function linePlies(fen: string, moves: string[]): LinePly[] {
+  const chess = new Chess(fen)
+  const [, turn, , , , full] = fen.split(' ')
+  let moveNo = Number(full) || 1
+  let white = turn !== 'b'
+  return moves.map((san, i) => {
+    const m = chess.move(san)
+    const label = white ? `${moveNo}.` : i === 0 ? `${moveNo}...` : ''
+    if (!white) moveNo++
+    white = !white
+    return { san: m.san, label, from: m.from, to: m.to, fen: chess.fen() }
+  })
+}
