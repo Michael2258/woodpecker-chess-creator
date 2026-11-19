@@ -124,4 +124,27 @@ describe('repository', () => {
     expect(await repo.currentCycle(set.id)).toBeUndefined()
     expect((await repo.startCycle(set.id)).number).toBe(1)
   })
+
+  it('fills in ticks of puzzles already in the set instead of adding them again', async () => {
+    const set = await repo.createSet('S')
+    const p = await repo.addPuzzle(set.id, { fen: FEN, solution: ['Qxf7#'] })
+    const other = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1'
+    const { updated, rest } = await repo.fillTicks(set.id, [
+      { fen: FEN, solution: ['h5f7'], ticks: ['4.Qxf7#'] },
+      { fen: other, solution: ['e5'] },
+    ])
+    expect(updated).toBe(1)
+    expect(rest.map((r) => r.fen)).toEqual([other])
+    expect((await repo.listPuzzles(set.id)).map((x) => [x.id, x.ticks])).toEqual([[p.id, ['4.Qxf7#']]])
+  })
+
+  it('records points with an attempt and lets them be changed', async () => {
+    const set = await repo.createSet('S')
+    const p = await repo.addPuzzle(set.id, { fen: FEN, solution: ['Qxf7#'] })
+    const c = await repo.startCycle(set.id)
+    await repo.recordAttempt(c.id, { puzzleId: p.id, solved: false, timeMs: 5, sessionId: 's1', firstMove: false, ticksSeen: [false] })
+    await repo.updateAttemptScore(c.id, p.id, { firstMove: true, ticksSeen: [true] })
+    const [a] = (await repo.getCycle(c.id))!.attempts
+    expect([a.sessionId, a.firstMove, a.ticksSeen]).toEqual(['s1', true, [true]])
+  })
 })

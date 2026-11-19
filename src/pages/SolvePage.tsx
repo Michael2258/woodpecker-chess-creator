@@ -2,10 +2,13 @@ import { Chess } from 'chess.js'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CycleHistory } from '../components/CycleHistory'
+import { ScoreCard } from '../components/ScoreCard'
+import { SessionsTable } from '../components/SessionsTable'
 import { PlayBoard, type BoardMove } from '../components/PlayBoard'
 import { SolutionStepper } from '../components/SolutionStepper'
 import { checkSolverMove, formatLine, linePlies, solverColor } from '../chess/puzzle'
-import { formatDuration, nextPuzzleInCycle, summarizeCycle } from '../model/cycles'
+import { formatDuration, formatPercent, nextPuzzleInCycle, summarizeCycle, summarizeSession } from '../model/cycles'
+import { resolveTicks, suggestScore, type Score } from '../model/points'
 import { displayTitle } from '../model/display'
 import type { Cycle, Puzzle, PuzzleSet } from '../model/types'
 import { repo } from '../repo'
@@ -25,6 +28,10 @@ export function SolvePage({ setId }: { setId: string }) {
   // The cycle being solved stays on screen even once its last result is saved,
   // so the final puzzle's result is shown before the summary.
   const [pinned, setPinned] = useState<string | null>(null)
+  // One sitting at the board. A new one starts after "End session".
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
+  // Showing the report for the session that was just ended.
+  const [sessionReport, setSessionReport] = useState<{ cycleId: string; sessionId: string } | null>(null)
 
   if (data === undefined) return <p className="muted">Loading…</p>
   const { set, puzzles, cycles } = data
@@ -42,16 +49,30 @@ export function SolvePage({ setId }: { setId: string }) {
   const sessionCycle = summaryFor ? undefined : (cycles.find((c) => c.id === pinned) ?? current)
   if (sessionCycle && sessionCycle.id !== pinned) setPinned(sessionCycle.id)
 
+  const reportCycle = sessionReport ? cycles.find((c) => c.id === sessionReport.cycleId) : undefined
+
   let body
-  if (summaryCycle) {
+  if (sessionReport && reportCycle) {
+    body = (
+      <SessionReport
+        set={set}
+        cycle={reportCycle}
+        sessionId={sessionReport.sessionId}
+        total={puzzles.length}
+        onContinue={() => setSessionReport(null)}
+      />
+    )
+  } else if (summaryCycle) {
     body = (
       <CycleSummary
         set={set}
         cycle={summaryCycle}
         cycles={cycles}
         puzzles={puzzles}
+        sessionId={sessionId}
         onStartNext={async () => {
           await repo.startCycle(set.id)
+          setSessionId(crypto.randomUUID())
           setSummaryFor(null)
         }}
       />
@@ -62,9 +83,14 @@ export function SolvePage({ setId }: { setId: string }) {
         key={sessionCycle.id}
         cycle={sessionCycle}
         puzzles={puzzles}
+        sessionId={sessionId}
         onFinished={(id) => {
           setSummaryFor(id)
           setPinned(null)
+        }}
+        onEndSession={() => {
+          setSessionReport({ cycleId: sessionCycle.id, sessionId })
+          setSessionId(crypto.randomUUID())
         }}
       />
     )
@@ -118,11 +144,15 @@ function StartView({ set, puzzles, cycles }: { set: PuzzleSet; puzzles: Puzzle[]
 function Session({
   cycle,
   puzzles,
+  sessionId,
   onFinished,
+  onEndSession,
 }: {
   cycle: Cycle
   puzzles: Puzzle[]
+  sessionId: string
   onFinished: (cycleId: string) => void
+  onEndSession: () => void
 }) {
   // Stay on the current puzzle after its result is saved, until "Next" is pressed.
   const [puzzleId, setPuzzleId] = useState<string | null>(() => nextPuzzleInCycle(cycle, puzzles)?.id ?? null)
@@ -130,6 +160,7 @@ function Session({
   const index = puzzle ? puzzles.findIndex((p) => p.id === puzzle.id) : -1
   const doneCount = cycle.attempts.length
   const elapsed = summarizeCycle(cycle).totalTimeMs
+  const thisSession = summarizeSession(cycle, sessionId)
 
   function goNext() {
     const next = nextPuzzleInCycle(cycle, puzzles)
@@ -162,15 +193,30 @@ function Session({
         </span>
         <span className="muted">
           {doneCount} done · {formatDuration(elapsed)} so far
+          {thisSession && ` · this session ${thisSession.attempted} in ${formatDuration(thisSession.totalTimeMs)}`}
         </span>
-        <button className="ghost small" onClick={abandon}>
-          Abandon cycle
-        </button>
+        <span className="row bar-actions">
+          {thisSession && (
+            <button className="secondary small" onClick={onEndSession}>
+              End session
+            </button>
+          )}
+          <button className="ghost small" onClick={abandon}>
+            Abandon cycle
+          </button>
+        </span>
       </div>
       <div className="progress" aria-hidden="true">
         <div style={{ width: `${(doneCount / puzzles.length) * 100}%` }} />
       </div>
-      <PuzzleRun key={puzzle.id} puzzle={puzzle} number={index + 1} cycleId={cycle.id} onNext={goNext} />
+      <PuzzleRun
+        key={puzzle.id}
+        puzzle={puzzle}
+        number={index + 1}
+        cycleId={cycle.id}
+        sessionId={sessionId}
+        onNext={goNext}
+      />
     </>
   )
 }
@@ -181,11 +227,13 @@ function PuzzleRun({
   puzzle,
   number,
   cycleId,
+  sessionId,
   onNext,
 }: {
   puzzle: Puzzle
   number: number
   cycleId: string
+  sessionId: string
   onNext: () => void
 }) {
   const [fen, setFen] = useState(puzzle.fen)
@@ -198,6 +246,11 @@ function PuzzleRun({
   // When the solution is shown, how many of its moves are played on the board.
   const [solutionPly, setSolutionPly] = useState<number | null>(null)
   const plies = useMemo(() => linePlies(puzzle.fen, puzzle.solution), [puzzle.fen, puzzle.solution])
+  const ticks = useMemo(
+    () => resolveTicks(puzzle.fen, puzzle.solution, puzzle.ticks),
+    [puzzle.fen, puzzle.solution, puzzle.ticks],
+  )
+  const [score, setScore] = useState<Score | null>(null)
   const [startedAt] = useState(() => Date.now())
   const [now, setNow] = useState(startedAt)
   const timers = useRef<number[]>([])
@@ -221,11 +274,27 @@ function PuzzleRun({
   const later = (fn: () => void, ms: number) => timers.current.push(window.setTimeout(fn, ms))
   const color = solverColor(puzzle.fen)
 
-  async function finish(solved: boolean) {
+  /** `wrongPly` is where the solver went wrong or gave up; null when solved. */
+  async function finish(wrongPly: number | null) {
     const spent = Date.now() - startedAt
+    const solved = wrongPly === null
+    const suggested = suggestScore(ticks, wrongPly)
     setTimeMs(spent)
+    setScore(suggested)
     setStatus(solved ? 'solved' : 'missed')
-    await repo.recordAttempt(cycleId, { puzzleId: puzzle.id, solved, timeMs: spent })
+    await repo.recordAttempt(cycleId, {
+      puzzleId: puzzle.id,
+      solved,
+      timeMs: spent,
+      sessionId,
+      firstMove: suggested.firstMove,
+      ticksSeen: suggested.ticks,
+    })
+  }
+
+  async function changeScore(next: Score) {
+    setScore(next)
+    await repo.updateAttemptScore(cycleId, puzzle.id, { firstMove: next.firstMove, ticksSeen: next.ticks })
   }
 
   function onMove(move: BoardMove) {
@@ -240,11 +309,11 @@ function PuzzleRun({
 
     if (result.result === 'wrong') {
       setWrong({ played: played.san, expected: result.expected })
-      void finish(false)
+      void finish(ply)
       return
     }
     if (result.solved) {
-      void finish(true)
+      void finish(null)
       return
     }
     // Show the solver's move, then the opponent's reply.
@@ -320,13 +389,17 @@ function PuzzleRun({
                 className="ghost small"
                 onClick={() => {
                   setWrong(null)
-                  void finish(false)
+                  void finish(ply)
                   showSolution()
                 }}
               >
                 Give up and show the solution
               </button>
             </div>
+          )}
+
+          {status !== 'solving' && score && (
+            <ScoreCard firstMove={plies[0]} ticks={ticks} score={score} onChange={changeScore} />
           )}
 
           {status !== 'solving' && (
@@ -383,14 +456,17 @@ function CycleSummary({
   cycle,
   cycles,
   puzzles,
+  sessionId,
   onStartNext,
 }: {
   set: PuzzleSet
   cycle: Cycle
   cycles: Cycle[]
   puzzles: Puzzle[]
+  sessionId: string
   onStartNext: () => void
 }) {
+  const lastSession = summarizeSession(cycle, sessionId)
   const s = summarizeCycle(cycle)
   const previous = cycles.filter((c) => c.completedAt !== null && c.number < cycle.number).at(-1)
   const p = previous ? summarizeCycle(previous) : null
@@ -401,11 +477,19 @@ function CycleSummary({
 
   const timeDiff = p ? s.totalTimeMs - p.totalTimeMs : 0
   const accDiff = p ? Math.round((s.accuracy - p.accuracy) * 100) : 0
+  const scoreDiff = p && p.score !== null && s.score !== null ? Math.round((s.score - p.score) * 100) : null
 
   return (
     <>
       <section className="card stack">
         <h2>Cycle {cycle.number} complete</h2>
+        {lastSession && lastSession.attempted < s.attempted && (
+          <p className="muted small">
+            This session: {lastSession.attempted} {lastSession.attempted === 1 ? 'puzzle' : 'puzzles'} in{' '}
+            {formatDuration(lastSession.totalTimeMs)}
+            {lastSession.score !== null && `, ${lastSession.points}/${lastSession.maxPoints} points`}.
+          </p>
+        )}
         <div className="stats">
           <div>
             <span className="stat">{formatDuration(s.totalTimeMs)}</span>
@@ -418,12 +502,30 @@ function CycleSummary({
             <span className="stat">{Math.round(s.accuracy * 100)}%</span>
             <span className="muted small">
               {s.solved} of {s.attempted} solved
-              {p && ` · ${accDiff >= 0 ? '+' : ''}${accDiff} pts`}
+              {p && ` · ${accDiff >= 0 ? '+' : ''}${accDiff}%`}
             </span>
           </div>
+          {s.score !== null && (
+            <div>
+              <span className="stat">
+                {s.points}/{s.maxPoints}
+              </span>
+              <span className="muted small">
+                points · {formatPercent(s.score)}
+                {scoreDiff !== null && ` · ${scoreDiff >= 0 ? '+' : ''}${scoreDiff}%`}
+              </span>
+            </div>
+          )}
           <div>
             <span className="stat">{formatDuration(s.attempted ? s.totalTimeMs / s.attempted : 0)}</span>
             <span className="muted small">per puzzle</span>
+          </div>
+          <div>
+            <span className="stat">{s.days}</span>
+            <span className="muted small">
+              {s.days === 1 ? 'day' : 'days'}
+              {p && p.days !== s.days && ` · ${p.days} last cycle`}
+            </span>
           </div>
         </div>
         <div className="row wrap">
@@ -433,6 +535,8 @@ function CycleSummary({
           </a>
         </div>
       </section>
+
+      <SessionsTable cycle={cycle} />
 
       {missed.length > 0 && (
         <section className="card">
@@ -452,6 +556,65 @@ function CycleSummary({
       )}
 
       <CycleHistory cycles={cycles} />
+    </>
+  )
+}
+
+function SessionReport({
+  set,
+  cycle,
+  sessionId,
+  total,
+  onContinue,
+}: {
+  set: PuzzleSet
+  cycle: Cycle
+  sessionId: string
+  total: number
+  onContinue: () => void
+}) {
+  const s = summarizeSession(cycle, sessionId)
+  const c = summarizeCycle(cycle)
+  return (
+    <>
+      <section className="card stack">
+        <h2>Session finished</h2>
+        {s ? (
+          <div className="stats">
+            <div>
+              <span className="stat">{formatDuration(s.totalTimeMs)}</span>
+              <span className="muted small">solving time</span>
+            </div>
+            <div>
+              <span className="stat">{s.attempted}</span>
+              <span className="muted small">
+                {s.attempted === 1 ? 'puzzle' : 'puzzles'} · {s.solved} solved
+              </span>
+            </div>
+            {s.score !== null && (
+              <div>
+                <span className="stat">
+                  {s.points}/{s.maxPoints}
+                </span>
+                <span className="muted small">points · {formatPercent(s.score)}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="muted">No puzzles were solved in this session.</p>
+        )}
+        <p className="muted small">
+          Cycle {cycle.number}: {c.attempted} of {total} puzzles done in {formatDuration(c.totalTimeMs)}
+          {c.score !== null && `, ${formatPercent(c.score)} of points`}.
+        </p>
+        <div className="row wrap">
+          <button onClick={onContinue}>Start a new session</button>
+          <a className="button secondary-link" href={paths.set(set.id)}>
+            Back to set
+          </a>
+        </div>
+      </section>
+      <SessionsTable cycle={cycle} />
     </>
   )
 }

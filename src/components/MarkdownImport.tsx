@@ -16,11 +16,13 @@ export function MarkdownImport({ target, label }: { target: Target; label: strin
   const [setName, setSetName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<string | null>(null)
 
   async function onPick(f: File | undefined) {
     if (input.current) input.current.value = ''
     if (!f) return
     setError(null)
+    setDone(null)
     try {
       const parsed = parseMarkdownPuzzles(await f.text())
       setFile({ fileName: f.name, parsed })
@@ -46,7 +48,18 @@ export function MarkdownImport({ target, label }: { target: Target; label: strin
         }
         navigate(paths.set(set.id))
       } else {
-        await repo.addPuzzles(target.setId, file.parsed.puzzles)
+        // Puzzles already in the set aren't added twice; their ticked moves are updated instead.
+        const { updated, rest } = await repo.fillTicks(target.setId, file.parsed.puzzles)
+        await repo.addPuzzles(target.setId, rest)
+        const parts = [`Added ${rest.length} ${rest.length === 1 ? 'puzzle' : 'puzzles'}.`]
+        const already = file.parsed.puzzles.length - rest.length
+        if (already) {
+          parts.push(
+            `${already} ${already === 1 ? 'was' : 'were'} already in this set` +
+              (updated ? `; updated the ticked moves of ${updated}.` : '.'),
+          )
+        }
+        setDone(parts.join(' '))
       }
       setFile(null)
     } catch (err) {
@@ -75,6 +88,7 @@ export function MarkdownImport({ target, label }: { target: Target; label: strin
           {label}
         </button>
         {error && <p className="error">{error}</p>}
+        {done && <p className="info">{done}</p>}
       </>
     )
   }
@@ -89,7 +103,9 @@ export function MarkdownImport({ target, label }: { target: Target; label: strin
           {puzzles.length === 0
             ? 'No puzzles with a solution were found in this file.'
             : `Found ${puzzles.length} ${puzzles.length === 1 ? 'puzzle' : 'puzzles'}${
-                target.kind === 'set' ? ', to be added at the end of this set' : ''
+                target.kind === 'set'
+                  ? '. New ones are added at the end of this set; ones already in it get their ticked moves updated'
+                  : ''
               }.`}
         </p>
       </div>

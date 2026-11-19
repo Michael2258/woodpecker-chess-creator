@@ -5,6 +5,14 @@ import type { WoodpeckerDB } from './db'
 
 const newId = (): Id => crypto.randomUUID()
 
+export interface PuzzleInput {
+  fen: string
+  solution: string[]
+  title?: string
+  note?: string
+  ticks?: string[]
+}
+
 /** All reads and writes go through here, so the UI never touches tables directly. */
 export function createRepository(db: WoodpeckerDB, now: () => number = Date.now) {
   return {
@@ -47,7 +55,7 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
 
     async addPuzzle(
       setId: Id,
-      input: { fen: string; solution: string[]; title?: string; note?: string },
+      input: PuzzleInput,
     ): Promise<Puzzle> {
       const parsed = normalizeSolution(input.fen, input.solution)
       if (!parsed.ok) throw new Error(parsed.error)
@@ -63,6 +71,7 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
           fen: parsed.puzzle.fen,
           solution: parsed.puzzle.solution,
           note: input.note ?? '',
+          ...(input.ticks?.length ? { ticks: input.ticks } : {}),
           createdAt: t,
           updatedAt: t,
         }
@@ -78,7 +87,7 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
      */
     async addPuzzles(
       setId: Id,
-      inputs: { fen: string; solution: string[]; title?: string; note?: string }[],
+      inputs: PuzzleInput[],
     ): Promise<Puzzle[]> {
       const checked = inputs.map((input, i) => {
         const parsed = normalizeSolution(input.fen, input.solution)
@@ -98,6 +107,7 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
           fen: parsed.fen,
           solution: parsed.solution,
           note: input.note ?? '',
+          ...(input.ticks?.length ? { ticks: input.ticks } : {}),
           createdAt: t,
           updatedAt: t,
         }))
@@ -109,7 +119,7 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
 
     async updatePuzzle(
       id: Id,
-      changes: Partial<Pick<Puzzle, 'fen' | 'solution' | 'title' | 'note'>>,
+      changes: Partial<Pick<Puzzle, 'fen' | 'solution' | 'title' | 'note' | 'ticks'>>,
     ) {
       const existing = await db.puzzles.get(id)
       if (!existing) throw new Error('Puzzle not found.')
@@ -121,6 +131,36 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
         update.solution = parsed.puzzle.solution
       }
       await db.puzzles.update(id, update)
+    },
+
+    /**
+     * Fills in the ticked moves of puzzles already in the set from imported
+     * copies (same position and line), so a set imported before ticks were
+     * marked can be updated without losing its training history. Returns
+     * the inputs that matched no existing puzzle.
+     */
+    async fillTicks(setId: Id, inputs: PuzzleInput[]): Promise<{ updated: number; rest: PuzzleInput[] }> {
+      return db.transaction('rw', db.puzzles, async () => {
+        const existing = await this.listPuzzles(setId)
+        const key = (fen: string, solution: string[]) => `${fen}|${solution.join(' ')}`
+        const byKey = new Map(existing.map((p) => [key(p.fen, p.solution), p]))
+        let updated = 0
+        const rest: PuzzleInput[] = []
+        for (const input of inputs) {
+          const parsed = normalizeSolution(input.fen, input.solution)
+          const match = parsed.ok ? byKey.get(key(parsed.puzzle.fen, parsed.puzzle.solution)) : undefined
+          if (!match) {
+            rest.push(input)
+            continue
+          }
+          const ticks = input.ticks ?? []
+          if (ticks.length && ticks.join() !== (match.ticks ?? []).join()) {
+            await db.puzzles.update(match.id, { ticks, updatedAt: now() })
+            updated++
+          }
+        }
+        return { updated, rest }
+      })
     },
 
     /** Removes a puzzle and closes the gap in the order of the rest. */
@@ -182,6 +222,16 @@ export function createRepository(db: WoodpeckerDB, now: () => number = Date.now)
         }
         await db.cycles.add(cycle)
         return cycle
+      })
+    },
+
+    /** Changes the points of an attempt that was already recorded. */
+    async updateAttemptScore(cycleId: Id, puzzleId: Id, score: { firstMove: boolean; ticksSeen: boolean[] }) {
+      await db.transaction('rw', db.cycles, async () => {
+        const cycle = await db.cycles.get(cycleId)
+        if (!cycle) throw new Error('Cycle not found.')
+        const attempts = cycle.attempts.map((a) => (a.puzzleId === puzzleId ? { ...a, ...score } : a))
+        await db.cycles.put({ ...cycle, attempts })
       })
     },
 
