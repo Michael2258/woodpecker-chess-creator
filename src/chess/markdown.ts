@@ -1,3 +1,4 @@
+import { parseTickList } from '../model/points'
 import { parsePuzzleInput } from './puzzle'
 
 export interface ImportedPuzzle {
@@ -5,6 +6,8 @@ export interface ImportedPuzzle {
   note: string
   fen: string
   solution: string[]
+  /** Moves marked with a ✓, from the optional "**Ticks:**" line. */
+  ticks?: string[]
 }
 
 export interface SkippedSection {
@@ -25,13 +28,15 @@ export interface MarkdownImport {
  *     ## 1. Hamppe – Steinitz, Vienna 1860
  *     **Title:** 1. Hamppe – Steinitz, Vienna 1860
  *     **Note:** Black would have been lost without this resource.
+ *     **Ticks:** 31...Rh8#
  *     ```
  *     [FEN "..."]
  *     30. ... Rxh2+ 31. Kxh2 Rh8#
  *     ```
  *
  * The title falls back to the heading, the note is optional ("(none)" counts
- * as empty), and the fenced block holds a PGN with a [FEN] header. Sections
+ * as empty), "Ticks" optionally lists the moves marked with a ✓ in the book
+ * (each worth a point; separated by commas), and the fenced block holds a PGN with a [FEN] header. Sections
  * without a solution line, or whose moves are not legal, are skipped and
  * reported so the user can see why.
  */
@@ -71,11 +76,13 @@ export function parseMarkdownPuzzles(text: string): MarkdownImport {
       skipped.push({ heading, reason: 'No solution moves, only a position.' })
       continue
     }
+    const ticks = parseTickList(field(body, 'Ticks') ?? '')
     puzzles.push({
       title: field(body, 'Title') ?? heading,
       note: field(body, 'Note') ?? '',
       fen: parsed.puzzle.fen,
       solution: parsed.puzzle.solution,
+      ...(ticks.length ? { ticks } : {}),
     })
   }
   return { name, puzzles, skipped }

@@ -236,3 +236,26 @@ button.move.current, button.move.current:hover:not(:disabled) { background: var(
 .step-controls .muted { margin-left: 6px; font-variant-numeric: tabular-nums; }
 .stepper .hint { margin: 0; }
 @media (hover: none) { .stepper .hint { display: none; } }
+
+/* ---------- Points and reports ---------- */
+.session-bar .bar-actions { margin-left: auto; gap: 8px; }
+.session-bar .bar-actions button { margin-left: 0; }
+.score-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px 10px; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.score-card legend { padding: 0 6px; font-weight: 600; }
+.score-points { font-variant-numeric: tabular-nums; font-size: 1.1rem; }
+.score-card p { margin: 0; }
+label.check { display: flex; flex-direction: row; align-items: center; gap: 8px; font-weight: 400; cursor: pointer; }
+label.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); flex-shrink: 0; }
+.mono { font-family: ui-monospace, Consolas, monospace; }
+.goal { margin: 0; }
+.goal.done { font-weight: 600; color: var(--accent); }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.chart { margin: 0; }
+.chart figcaption { font-size: 0.875rem; color: var(--muted); margin-bottom: 4px; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .axis { stroke: var(--border); stroke-width: 1; }
+.chart .bar path { fill: var(--accent); }
+.chart .bar:hover path { fill: var(--accent-hover); }
+.chart .hit { fill: transparent; }
+.chart text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.chart text.value { fill: var(--text); }

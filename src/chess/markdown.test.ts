@@ -55,4 +55,23 @@ describe('parseMarkdownPuzzles', () => {
     expect(result.skipped.map((s) => s.heading)).toEqual(['A', 'B'])
     expect(result.skipped[0].reason).toBe('No FEN or PGN block.')
   })
+
+  it('reads the ticked moves', () => {
+    const md = [
+      '## 1',
+      '**Ticks:** 1.Nf7#, 1.Nxh7',
+      '```',
+      '[FEN "6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1"]',
+      '1. Nf7# *',
+      '```',
+      '## 2',
+      '```',
+      '[FEN "6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1"]',
+      '1. Nf7# *',
+      '```',
+    ].join('\n')
+    const [a, b] = parseMarkdownPuzzles(md).puzzles
+    expect(a.ticks).toEqual(['1.Nf7#', '1.Nxh7'])
+    expect(b.ticks).toBeUndefined()
+  })
 })

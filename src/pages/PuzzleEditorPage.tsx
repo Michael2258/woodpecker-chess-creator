@@ -5,6 +5,7 @@ import { PlayBoard, type BoardMove } from '../components/PlayBoard'
 import { PositionEditor } from '../components/PositionEditor'
 import { fenAfter, formatLine, parsePuzzleInput, solverColor } from '../chess/puzzle'
 import { fenFromSetup, placementFromFen, START_FEN, type Placement } from '../chess/setup'
+import { formatTickList, parseTickList, resolveTicks } from '../model/points'
 import type { Puzzle } from '../model/types'
 import { repo } from '../repo'
 import { navigate, paths } from '../router'
@@ -57,6 +58,7 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
   const [solution, setSolution] = useState<string[]>(puzzle?.solution ?? [])
   const [title, setTitle] = useState(puzzle?.title ?? '')
   const [note, setNote] = useState(puzzle?.note ?? '')
+  const [ticksText, setTicksText] = useState(formatTickList(puzzle?.ticks ?? []))
   const [paste, setPaste] = useState('')
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -117,7 +119,7 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
     if (!startFen) return
     setSaving(true)
     try {
-      const fields = { fen: startFen, solution, title: title.trim(), note }
+      const fields = { fen: startFen, solution, title: title.trim(), note, ticks: parseTickList(ticksText) }
       if (puzzle) await repo.updatePuzzle(puzzle.id, fields)
       else await repo.addPuzzle(setId, fields)
       if (addAnother) {
@@ -127,6 +129,7 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
         setSolution([])
         setTitle(nextTitle(title))
         setNote('')
+        setTicksText('')
         setMessage({ kind: 'info', text: 'Saved. Set up the next puzzle.' })
         window.scrollTo({ top: 0 })
       } else {
@@ -140,6 +143,7 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
   }
 
   const currentFen = startFen ? fenAfter(startFen, solution) : null
+  const defaultTick = startFen && solution.length ? resolveTicks(startFen, solution, undefined)[0]?.label : null
   const lastMove = startFen && solution.length ? lastMoveSquares(startFen, solution) : null
 
   return (
@@ -232,6 +236,15 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
                 <label>
                   Title <span className="muted small">(optional, e.g. the book's puzzle number)</span>
                   <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+                </label>
+                <label>
+                  Ticked moves <span className="muted small">(✓ in the book, 1 point each besides the first move)</span>
+                  <input
+                    type="text"
+                    value={ticksText}
+                    onChange={(e) => setTicksText(e.target.value)}
+                    placeholder={defaultTick ? `${defaultTick} (the last move, if left empty)` : 'e.g. 20.Bxe6#, 19...Kf8'}
+                  />
                 </label>
                 <label>
                   Note

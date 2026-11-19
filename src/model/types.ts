@@ -33,6 +33,12 @@ export interface Puzzle {
   solution: string[]
   /** Free-form note the user keeps about this puzzle. */
   note: string
+  /**
+   * Moves marked with a ✓ in the book's solution, e.g. ["40.Kxb5", "41.Kb5"].
+   * Each one found is worth a point. When missing, the last move of the
+   * solution is the ticked one.
+   */
+  ticks?: string[]
   createdAt: number
   updatedAt: number
 }
@@ -43,6 +49,12 @@ export interface Attempt {
   /** Time spent on the puzzle in milliseconds. */
   timeMs: number
   attemptedAt: number
+  /** The sitting this attempt was made in. Missing on older attempts. */
+  sessionId?: string
+  /** Whether the first move was found (1 point). Missing on older attempts. */
+  firstMove?: boolean
+  /** One entry per ticked move of the puzzle: whether it was seen (1 point each). */
+  ticksSeen?: boolean[]
 }
 
 export interface Cycle {
@@ -63,4 +75,26 @@ export interface CycleSummary {
   /** Solved divided by attempted, from 0 to 1. 0 when nothing was attempted. */
   accuracy: number
   totalTimeMs: number
+  /** Points scored, counting only attempts that have a score. */
+  points: number
+  maxPoints: number
+  /** Points divided by maxPoints, or null when no attempt has a score. */
+  score: number | null
+  /** Number of different days the puzzles were solved on. */
+  days: number
+}
+
+export interface SessionSummary {
+  /** Session id, or a generated key for older attempts without one. */
+  key: string
+  /** When the first puzzle of the session was started. */
+  startedAt: number
+  endedAt: number
+  attempted: number
+  solved: number
+  totalTimeMs: number
+  points: number
+  maxPoints: number
+  score: number | null
+  days: number
 }
