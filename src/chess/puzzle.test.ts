@@ -3,6 +3,7 @@ import {
   checkSolverMove,
   fenAfter,
   formatLine,
+  linePlies,
   normalizeSolution,
   parsePuzzleInput,
   solverColor,
@@ -92,5 +93,19 @@ describe('formatLine and fenAfter', () => {
 
   it('plays a line forward', () => {
     expect(fenAfter(BACK_RANK, ['Rd1']).split(' ')[0]).toBe('6k1/5ppp/8/8/8/8/5PPP/3rR1K1')
+  })
+})
+
+describe('linePlies', () => {
+  it('gives each move its number label, squares and position', () => {
+    const plies = linePlies(BACK_RANK, ['Rd1', 'Rxd1'])
+    expect(plies.map((p) => `${p.label} ${p.san}`.trim())).toEqual(['1... Rd1', '2. Rxd1'])
+    expect(plies[0]).toMatchObject({ from: 'd8', to: 'd1' })
+    expect(plies[1]).toMatchObject({ from: 'e1', to: 'd1' })
+    expect(plies[1].fen).toBe(fenAfter(BACK_RANK, ['Rd1', 'Rxd1']))
+  })
+
+  it('labels only white moves when white starts', () => {
+    expect(linePlies(SCHOLAR, ['Qxf7#']).map((p) => p.label)).toEqual(['4.'])
   })
 })

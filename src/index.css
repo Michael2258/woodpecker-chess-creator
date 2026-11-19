@@ -218,3 +218,21 @@ table.cycles .num-col { text-align: right; }
 .import-list li { display: flex; flex-direction: column; min-width: 0; }
 .import-list .small { overflow-wrap: anywhere; }
 .skipped ul { margin: 4px 0 0; padding-left: 1.25em; }
+
+/* ---------- Solution stepper ---------- */
+.move-list {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px;
+  font-family: ui-monospace, Consolas, monospace; font-size: 0.95rem;
+}
+.move-list li { display: inline-flex; align-items: center; gap: 2px; }
+.move-list .move-no { color: var(--muted); padding-left: 4px; }
+button.move {
+  min-height: 0; padding: 2px 6px; border-radius: 6px; font: inherit;
+  background: transparent; border-color: transparent; color: var(--text);
+}
+button.move:hover:not(:disabled) { background: var(--surface-2); }
+button.move.current, button.move.current:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.step-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.step-controls .muted { margin-left: 6px; font-variant-numeric: tabular-nums; }
+.stepper .hint { margin: 0; }
+@media (hover: none) { .stepper .hint { display: none; } }
