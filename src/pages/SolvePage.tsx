@@ -245,6 +245,8 @@ function PuzzleRun({
   const [timeMs, setTimeMs] = useState(0)
   // When the solution is shown, how many of its moves are played on the board.
   const [solutionPly, setSolutionPly] = useState<number | null>(null)
+  // A different mate than the book's, shown in the stepper until stepping away from it.
+  const [ownMove, setOwnMove] = useState<string | null>(null)
   const plies = useMemo(() => linePlies(puzzle.fen, puzzle.solution), [puzzle.fen, puzzle.solution])
   const ticks = useMemo(
     () => resolveTicks(puzzle.fen, puzzle.solution, puzzle.ticks),
@@ -313,6 +315,10 @@ function PuzzleRun({
       return
     }
     if (result.solved) {
+      // Stay on the final position; if another mate was found, keep showing it.
+      const end = plies.findIndex((p) => p.fen === result.fen)
+      if (end !== -1) setSolutionPly(end + 1)
+      else setOwnMove(played.san)
       void finish(null)
       return
     }
@@ -367,20 +373,19 @@ function PuzzleRun({
           {status === 'solved' && <p className="result good">✓ Solved in {formatDuration(timeMs)}</p>}
 
           {status === 'missed' && (
-            <div className="stack">
-              <p className="result bad">
-                ✗ {wrong ? `${wrong.played} isn't it. The move was ${wrong.expected}.` : 'Missed.'}
-              </p>
-              {solutionPly !== null ? (
-                <SolutionStepper plies={plies} ply={solutionPly} onChange={setSolutionPly} />
-              ) : (
-                <div>
-                  <button className="secondary" onClick={showSolution}>
-                    Show the solution
-                  </button>
-                </div>
-              )}
-            </div>
+            <p className="result bad">
+              ✗ {wrong ? `${wrong.played} isn't it. The move was ${wrong.expected}.` : 'Missed.'}
+            </p>
+          )}
+
+          {status !== 'solving' && (
+            <SolutionStepper
+              plies={plies}
+              ply={solutionPly}
+              offLine={ply}
+              ownMove={wrong?.played ?? ownMove ?? undefined}
+              onChange={setSolutionPly}
+            />
           )}
 
           {status === 'solving' && (

@@ -3,8 +3,15 @@ import type { LinePly } from '../chess/puzzle'
 
 interface Props {
   plies: LinePly[]
-  /** Number of moves played on the board: 0 is the start position. */
-  ply: number
+  /**
+   * Number of solution moves played on the board: 0 is the start position.
+   * Null while the board shows the solver's own move instead of the line.
+   */
+  ply: number | null
+  /** With `ply` null, how many solution moves came before the solver's own move. */
+  offLine?: number
+  /** The solver's own move, shown in the status while `ply` is null. */
+  ownMove?: string
   onChange: (ply: number) => void
 }
 
@@ -17,20 +24,24 @@ function typingInField(target: EventTarget | null) {
  * Controls for stepping through a solution one move at a time: buttons,
  * the arrow keys (plus Home/End), and a clickable move list.
  */
-export function SolutionStepper({ plies, ply, onChange }: Props) {
+export function SolutionStepper({ plies, ply, offLine = 0, ownMove, onChange }: Props) {
   const last = plies.length
+  // Off the line, "previous" goes back to the position before the solver's
+  // move and "next" shows the right move there.
+  const prev = ply === null ? offLine : ply - 1
+  const next = ply === null ? offLine + 1 : ply + 1
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.altKey || e.ctrlKey || e.metaKey || typingInField(e.target)) return
-      const next = { ArrowLeft: ply - 1, ArrowRight: ply + 1, Home: 0, End: last }[e.key]
-      if (next === undefined) return
+      const target = { ArrowLeft: prev, ArrowRight: next, Home: 0, End: last }[e.key]
+      if (target === undefined) return
       e.preventDefault()
-      onChange(Math.max(0, Math.min(last, next)))
+      onChange(Math.max(0, Math.min(last, target)))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [ply, last, onChange])
+  }, [prev, next, last, onChange])
 
   return (
     <div className="stepper stack">
@@ -52,17 +63,17 @@ export function SolutionStepper({ plies, ply, onChange }: Props) {
         <button className="icon" onClick={() => onChange(0)} disabled={ply === 0} aria-label="Back to start" title="Back to start (Home)">
           {'\u23EE\uFE0E'}
         </button>
-        <button className="icon" onClick={() => onChange(ply - 1)} disabled={ply === 0} aria-label="Previous move" title="Previous move (←)">
+        <button className="icon" onClick={() => onChange(Math.max(0, prev))} disabled={ply === 0} aria-label="Previous move" title="Previous move (←)">
           {'\u25C0\uFE0E'}
         </button>
-        <button className="icon" onClick={() => onChange(ply + 1)} disabled={ply === last} aria-label="Next move" title="Next move (→)">
+        <button className="icon" onClick={() => onChange(Math.min(last, next))} disabled={ply === last} aria-label="Next move" title="Next move (→)">
           {'\u25B6\uFE0E'}
         </button>
         <button className="icon" onClick={() => onChange(last)} disabled={ply === last} aria-label="Jump to end" title="Jump to end (End)">
           {'\u23ED\uFE0E'}
         </button>
         <span className="muted small">
-          {ply === 0 ? 'Start position' : `Move ${ply} of ${last}`}
+          {ply === null ? `Your move: ${ownMove ?? ''}` : ply === 0 ? 'Start position' : `Move ${ply} of ${last}`}
         </span>
       </div>
       <p className="muted small hint">Use the ← and → keys to step through the moves.</p>
