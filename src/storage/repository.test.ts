@@ -48,6 +48,32 @@ describe('repository', () => {
     await expect(repo.addPuzzle(set.id, { fen: FEN, solution: [] })).rejects.toThrow()
   })
 
+  it('adds several puzzles at once after the existing ones', async () => {
+    const set = await repo.createSet('S')
+    await repo.addPuzzle(set.id, { fen: FEN, solution: ['Qxf7#'] })
+    const added = await repo.addPuzzles(set.id, [
+      { fen: FEN, solution: ['h5f7'], title: 'A', note: 'n' },
+      { fen: FEN, solution: ['Qxf7#'], title: 'B' },
+    ])
+    expect(added.map((p) => p.solution)).toEqual([['Qxf7#'], ['Qxf7#']])
+    expect((await repo.listPuzzles(set.id)).map((p) => [p.order, p.title, p.note])).toEqual([
+      [0, '', ''],
+      [1, 'A', 'n'],
+      [2, 'B', ''],
+    ])
+  })
+
+  it('adds nothing when one puzzle in a batch is invalid', async () => {
+    const set = await repo.createSet('S')
+    await expect(
+      repo.addPuzzles(set.id, [
+        { fen: FEN, solution: ['Qxf7#'] },
+        { fen: FEN, solution: ['e5'], title: 'Bad' },
+      ]),
+    ).rejects.toThrow(/Bad: Move 1/)
+    expect(await repo.listPuzzles(set.id)).toEqual([])
+  })
+
   it('updates, reorders and deletes puzzles', async () => {
     const set = await repo.createSet('S')
     const ids = []
