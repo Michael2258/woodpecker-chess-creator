@@ -6,6 +6,7 @@ import { ScoreCard } from '../components/ScoreCard'
 import { SessionsTable } from '../components/SessionsTable'
 import { PlayBoard, type BoardMove } from '../components/PlayBoard'
 import { SolutionStepper } from '../components/SolutionStepper'
+import { CopyFenButton } from '../components/CopyFenButton'
 import { checkSolverMove, formatLine, linePlies, solverColor } from '../chess/puzzle'
 import { formatDuration, formatPercent, nextPuzzleInCycle, summarizeCycle, summarizeSession } from '../model/cycles'
 import { resolveTicks, suggestScore, type Score } from '../model/points'
@@ -355,6 +356,9 @@ function PuzzleRun({
           movable={status === 'solving' && !busy ? color : 'none'}
           lastMove={boardLastMove}
         />
+        <div className="row wrap board-actions">
+          <CopyFenButton fen={boardFen} />
+        </div>
       </div>
 
       <div className="editor-side">
