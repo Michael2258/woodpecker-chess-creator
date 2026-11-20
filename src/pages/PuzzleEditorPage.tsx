@@ -2,6 +2,7 @@ import { Chess } from 'chess.js'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { PlayBoard, type BoardMove } from '../components/PlayBoard'
+import { CopyFenButton } from '../components/CopyFenButton'
 import { PositionEditor } from '../components/PositionEditor'
 import { fenAfter, formatLine, parsePuzzleInput, solverColor } from '../chess/puzzle'
 import { fenFromSetup, placementFromFen, START_FEN, type Placement } from '../chess/setup'
@@ -195,6 +196,7 @@ function Editor({ setId, setName, puzzle }: { setId: string; setName: string; pu
               <button className="secondary" onClick={() => setSolution([])} disabled={!solution.length}>
                 Clear moves
               </button>
+              {currentFen && <CopyFenButton fen={currentFen} className="secondary" />}
             </div>
           )}
         </div>
