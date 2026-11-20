@@ -259,3 +259,4 @@ label.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--ac
 .chart .hit { fill: transparent; }
 .chart text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
 .chart text.value { fill: var(--text); }
+.backup-card p { margin: 0; }

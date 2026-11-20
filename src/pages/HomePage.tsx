@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState, type FormEvent } from 'react'
+import { BackupCard } from '../components/BackupCard'
 import { MarkdownImport } from '../components/MarkdownImport'
 import { repo } from '../repo'
 import { navigate, paths } from '../router'
@@ -66,6 +67,8 @@ export function HomePage() {
           ))}
         </ul>
       )}
+
+      <BackupCard />
     </>
   )
 }
