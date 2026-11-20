@@ -64,7 +64,7 @@ main { display: flex; flex-direction: column; gap: 16px; }
 .stack { display: flex; flex-direction: column; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
 
-input[type='text'], textarea {
+input[type='text'], input[type='email'], textarea {
   width: 100%; min-width: 0; padding: 10px 12px; font: inherit; color: inherit;
   background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
 }
@@ -259,3 +259,8 @@ label.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--ac
 .chart .hit { fill: transparent; }
 .chart text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
 .chart text.value { fill: var(--text); }
+.backup-card p { margin: 0; }
+.sync-card p { margin: 0; }
+.sync-card input[type=email] { flex: 1 1 220px; min-width: 0; }
+.sync-pill { margin-left: auto; font-size: 0.85rem; color: var(--muted); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }
+.sync-pill.bad { color: var(--danger); }

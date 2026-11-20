@@ -3,9 +3,11 @@ import { PuzzleEditorPage } from './pages/PuzzleEditorPage'
 import { SetPage } from './pages/SetPage'
 import { SolvePage } from './pages/SolvePage'
 import { paths, useRoute } from './router'
+import { syncLabel, useSyncState } from './sync/controller'
 
 export default function App() {
   const route = useRoute()
+  const sync = useSyncState()
   return (
     <div className="app">
       <header className="app-header">
@@ -13,6 +15,11 @@ export default function App() {
           Woodpecker Chess Creator
         </a>
         <span className="tagline">Build puzzle sets and solve them in cycles.</span>
+        {sync.configured && !sync.loading && (
+          <a className={`sync-pill${sync.error ? ' bad' : ''}`} href={paths.home()}>
+            {sync.email ? syncLabel(sync) : 'Sign in to sync'}
+          </a>
+        )}
       </header>
       <main>
         {route.name === 'home' && <HomePage />}

@@ -13,6 +13,8 @@ export type Route =
   | { name: 'notFound' }
 
 export function parseRoute(hash: string): Route {
+  // Sign-in links come back with the session in the hash; the sync code reads it.
+  if (/(access_token|error_description)=/.test(hash)) return { name: 'home' }
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent)
   if (parts.length === 0) return { name: 'home' }
   if (parts[0] === 'sets' && parts[1]) {
