@@ -84,7 +84,7 @@ export function BackupCard() {
         <p className="muted small">
           Your sets and progress are saved in this browser only. To continue on another device (for example your
           phone), save a backup here, then open the app there and restore it. Restoring replaces everything on that
-          device, so always restore from the device you trained on most recently.
+          device, so always restore from the device you trained on most recently. If you use sync, a restore also replaces your synced data.
         </p>
       </div>
       <input
