@@ -11,8 +11,16 @@ import { checkSolverMove, formatLine, linePlies, solverColor } from '../chess/pu
 import { formatDuration, formatPercent, nextPuzzleInCycle, summarizeCycle, summarizeSession } from '../model/cycles'
 import { resolveTicks, suggestScore, type Score } from '../model/points'
 import { displayTitle } from '../model/display'
-import type { Cycle, Puzzle, PuzzleSet } from '../model/types'
+import type { Attempt, Cycle, Puzzle, PuzzleSet } from '../model/types'
 import { repo } from '../repo'
+import {
+  loadPageState,
+  loadRunState,
+  savePageState,
+  saveRunState,
+  type PageState,
+  type RunState,
+} from '../storage/solveState'
 import { paths } from '../router'
 
 export function SolvePage({ setId }: { setId: string }) {
@@ -24,15 +32,19 @@ export function SolvePage({ setId }: { setId: string }) {
     }),
     [setId],
   )
-  // After the last puzzle, keep showing that cycle's summary.
-  const [summaryFor, setSummaryFor] = useState<string | null>(null)
-  // The cycle being solved stays on screen even once its last result is saved,
-  // so the final puzzle's result is shown before the summary.
-  const [pinned, setPinned] = useState<string | null>(null)
-  // One sitting at the board. A new one starts after "End session".
-  const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
-  // Showing the report for the session that was just ended.
-  const [sessionReport, setSessionReport] = useState<{ cycleId: string; sessionId: string } | null>(null)
+  // Kept in sessionStorage so a reload comes back to the same view.
+  // - summaryFor: after the last puzzle, keep showing that cycle's summary.
+  // - pinned: the cycle being solved stays on screen even once its last result
+  //   is saved, so the final puzzle's result is shown before the summary.
+  // - sessionId: one sitting at the board. A new one starts after "End session".
+  // - sessionReport: showing the report for the session that was just ended.
+  const [page, setPage] = useState<PageState>(
+    () =>
+      loadPageState(setId) ?? { sessionId: crypto.randomUUID(), pinned: null, summaryFor: null, sessionReport: null },
+  )
+  useEffect(() => savePageState(setId, page), [setId, page])
+  const { summaryFor, pinned, sessionId, sessionReport } = page
+  const update = (patch: Partial<PageState>) => setPage((p) => ({ ...p, ...patch }))
 
   if (data === undefined) return <p className="muted">Loading…</p>
   const { set, puzzles, cycles } = data
@@ -48,7 +60,7 @@ export function SolvePage({ setId }: { setId: string }) {
   const summaryCycle = summaryFor ? cycles.find((c) => c.id === summaryFor) : undefined
   const current = cycles.find((c) => c.completedAt === null)
   const sessionCycle = summaryFor ? undefined : (cycles.find((c) => c.id === pinned) ?? current)
-  if (sessionCycle && sessionCycle.id !== pinned) setPinned(sessionCycle.id)
+  if (sessionCycle && sessionCycle.id !== pinned) update({ pinned: sessionCycle.id })
 
   const reportCycle = sessionReport ? cycles.find((c) => c.id === sessionReport.cycleId) : undefined
 
@@ -60,7 +72,7 @@ export function SolvePage({ setId }: { setId: string }) {
         cycle={reportCycle}
         sessionId={sessionReport.sessionId}
         total={puzzles.length}
-        onContinue={() => setSessionReport(null)}
+        onContinue={() => update({ sessionReport: null })}
       />
     )
   } else if (summaryCycle) {
@@ -73,8 +85,7 @@ export function SolvePage({ setId }: { setId: string }) {
         sessionId={sessionId}
         onStartNext={async () => {
           await repo.startCycle(set.id)
-          setSessionId(crypto.randomUUID())
-          setSummaryFor(null)
+          update({ sessionId: crypto.randomUUID(), summaryFor: null })
         }}
       />
     )
@@ -85,14 +96,10 @@ export function SolvePage({ setId }: { setId: string }) {
         cycle={sessionCycle}
         puzzles={puzzles}
         sessionId={sessionId}
-        onFinished={(id) => {
-          setSummaryFor(id)
-          setPinned(null)
-        }}
-        onEndSession={() => {
-          setSessionReport({ cycleId: sessionCycle.id, sessionId })
-          setSessionId(crypto.randomUUID())
-        }}
+        onFinished={(id) => update({ summaryFor: id, pinned: null })}
+        onEndSession={() =>
+          update({ sessionReport: { cycleId: sessionCycle.id, sessionId }, sessionId: crypto.randomUUID() })
+        }
       />
     )
   } else {
@@ -156,7 +163,13 @@ function Session({
   onEndSession: () => void
 }) {
   // Stay on the current puzzle after its result is saved, until "Next" is pressed.
-  const [puzzleId, setPuzzleId] = useState<string | null>(() => nextPuzzleInCycle(cycle, puzzles)?.id ?? null)
+  // After a reload, come back to the puzzle that was on the board.
+  const [saved] = useState(() => loadRunState(cycle.setId, cycle.id))
+  const [puzzleId, setPuzzleId] = useState<string | null>(() =>
+    saved && puzzles.some((p) => p.id === saved.puzzleId)
+      ? saved.puzzleId
+      : (nextPuzzleInCycle(cycle, puzzles)?.id ?? null),
+  )
   const puzzle = puzzles.find((p) => p.id === puzzleId) ?? nextPuzzleInCycle(cycle, puzzles)
   const index = puzzle ? puzzles.findIndex((p) => p.id === puzzle.id) : -1
   const doneCount = cycle.attempts.length
@@ -215,7 +228,10 @@ function Session({
         puzzle={puzzle}
         number={index + 1}
         cycleId={cycle.id}
+        setId={cycle.setId}
         sessionId={sessionId}
+        attempt={cycle.attempts.find((a) => a.puzzleId === puzzle.id)}
+        saved={saved?.puzzleId === puzzle.id ? saved : null}
         onNext={goNext}
       />
     </>
@@ -228,34 +244,76 @@ function PuzzleRun({
   puzzle,
   number,
   cycleId,
+  setId,
   sessionId,
+  attempt,
+  saved,
   onNext,
 }: {
   puzzle: Puzzle
   number: number
   cycleId: string
+  setId: string
   sessionId: string
+  /** This puzzle's result in the cycle, when it was already recorded. */
+  attempt: Attempt | undefined
+  /** The state saved before a reload, when it was this puzzle. */
+  saved: RunState | null
   onNext: () => void
 }) {
-  const [fen, setFen] = useState(puzzle.fen)
-  const [ply, setPly] = useState(0)
-  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null)
-  const [status, setStatus] = useState<Status>('solving')
+  // A recorded result always wins, so a reload never records the puzzle twice.
+  const [initialStatus] = useState<Status>(() =>
+    attempt ? (attempt.solved ? 'solved' : 'missed') : (saved?.status ?? 'solving'),
+  )
+  const finishedBefore = initialStatus !== 'solving'
+  const [fen, setFen] = useState(saved?.fen ?? puzzle.fen)
+  const [ply, setPly] = useState(saved?.ply ?? 0)
+  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(saved?.lastMove ?? null)
+  const [status, setStatus] = useState<Status>(initialStatus)
   const [busy, setBusy] = useState(false)
-  const [wrong, setWrong] = useState<{ played: string; expected: string } | null>(null)
-  const [timeMs, setTimeMs] = useState(0)
+  const [wrong, setWrong] = useState<{ played: string; expected: string } | null>(saved?.wrong ?? null)
+  const [timeMs, setTimeMs] = useState(attempt?.timeMs ?? saved?.timeMs ?? 0)
   // When the solution is shown, how many of its moves are played on the board.
-  const [solutionPly, setSolutionPly] = useState<number | null>(null)
+  const [solutionPly, setSolutionPly] = useState<number | null>(
+    saved?.solutionPly ?? (finishedBefore && !saved ? 0 : null),
+  )
   // A different mate than the book's, shown in the stepper until stepping away from it.
-  const [ownMove, setOwnMove] = useState<string | null>(null)
+  const [ownMove, setOwnMove] = useState<string | null>(saved?.ownMove ?? null)
   const plies = useMemo(() => linePlies(puzzle.fen, puzzle.solution), [puzzle.fen, puzzle.solution])
   const ticks = useMemo(
     () => resolveTicks(puzzle.fen, puzzle.solution, puzzle.ticks),
     [puzzle.fen, puzzle.solution, puzzle.ticks],
   )
-  const [score, setScore] = useState<Score | null>(null)
-  const [startedAt] = useState(() => Date.now())
-  const [now, setNow] = useState(startedAt)
+  const [score, setScore] = useState<Score | null>(() => {
+    if (!attempt) return null
+    // Older attempts have no score saved: fall back to the suggestion.
+    const fallback = suggestScore(ticks, attempt.solved ? null : (saved?.ply ?? 0))
+    return {
+      firstMove: attempt.firstMove ?? fallback.firstMove,
+      ticks: attempt.ticksSeen?.length === ticks.length ? attempt.ticksSeen : fallback.ticks,
+    }
+  })
+  // The clock keeps running across a reload.
+  const [startedAt] = useState(() => saved?.startedAt ?? Date.now())
+  const [now, setNow] = useState(() => Date.now())
+
+  // Save what's on the board, except while the opponent's reply is pending.
+  useEffect(() => {
+    if (busy) return
+    saveRunState(setId, {
+      cycleId,
+      puzzleId: puzzle.id,
+      startedAt,
+      status,
+      fen,
+      ply,
+      lastMove,
+      wrong,
+      ownMove,
+      solutionPly,
+      timeMs,
+    })
+  }, [setId, cycleId, puzzle.id, startedAt, status, fen, ply, lastMove, wrong, ownMove, solutionPly, timeMs, busy])
   const timers = useRef<number[]>([])
   const nextButton = useRef<HTMLButtonElement>(null)
 
