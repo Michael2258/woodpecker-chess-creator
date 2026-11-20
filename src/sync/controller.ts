@@ -75,13 +75,23 @@ function scheduleSync(delay = 1500) {
   timer = setTimeout(() => void syncNow(), delay)
 }
 
-export async function sendSignInLink(email: string) {
+export async function signInWithPassword(email: string, password: string) {
   if (!client) throw new Error('Cloud sync is not set up.')
-  const { error } = await client.auth.signInWithOtp({
-    email: email.trim(),
-    options: { emailRedirectTo: window.location.origin + window.location.pathname },
-  })
+  const { error } = await client.auth.signInWithPassword({ email: email.trim(), password })
+  if (error) {
+    if (/invalid login credentials/i.test(error.message)) {
+      throw new Error('Wrong email or password. If this is your first time, choose "Create account" instead.')
+    }
+    throw new Error(error.message)
+  }
+}
+
+/** Returns false when the account needs its email confirmed before it can sign in. */
+export async function createAccount(email: string, password: string): Promise<boolean> {
+  if (!client) throw new Error('Cloud sync is not set up.')
+  const { data, error } = await client.auth.signUp({ email: email.trim(), password })
   if (error) throw new Error(error.message)
+  return Boolean(data.session)
 }
 
 export async function signOut() {

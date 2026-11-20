@@ -1,28 +1,38 @@
 import { useState, type FormEvent } from 'react'
-import { sendSignInLink, signOut, syncLabel, syncNow, useSyncState } from '../sync/controller'
+import { createAccount, signInWithPassword, signOut, syncLabel, syncNow, useSyncState } from '../sync/controller'
 
 /** Sign in once per device; after that sets and progress sync on their own. */
 export function SyncCard() {
   const s = useSyncState()
   const [email, setEmail] = useState('')
-  const [sentTo, setSentTo] = useState<string | null>(null)
+  const [password, setPassword] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   if (!s.configured) return null
 
-  async function onSend(e: FormEvent) {
-    e.preventDefault()
+  async function run(action: 'signIn' | 'create') {
     setBusy(true)
     setError(null)
+    setNotice(null)
     try {
-      await sendSignInLink(email)
-      setSentTo(email.trim())
+      if (action === 'signIn') {
+        await signInWithPassword(email, password)
+      } else if (!(await createAccount(email, password))) {
+        setNotice('Account created, but Supabase wants the email confirmed first. Open the link it sent, then sign in.')
+      }
+      setPassword('')
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setBusy(false)
     }
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    void run('signIn')
   }
 
   return (
@@ -49,39 +59,52 @@ export function SyncCard() {
             </button>
           </div>
         </>
-      ) : sentTo ? (
-        <>
-          <p className="small">
-            We sent a sign-in link to <strong>{sentTo}</strong>. Open it on this device to start syncing.
-          </p>
-          <div className="row wrap">
-            <button type="button" className="secondary" onClick={() => setSentTo(null)}>
-              Use a different email
-            </button>
-          </div>
-        </>
       ) : (
         <>
           <p className="muted small">
-            Sign in with the same email on your phone and computer, and everything on this device is uploaded and
-            kept in sync. No password needed: we email you a link.
+            Sign in with the same email and password on your phone and computer, and everything on this device is
+            uploaded and kept in sync. First time? Fill in both fields and choose Create account.
           </p>
-          <form className="row wrap" onSubmit={onSend}>
+          <form className="stack sync-form" onSubmit={onSubmit}>
             <input
               type="email"
               required
-              placeholder="you@example.com"
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               aria-label="Email for sync"
-              autoComplete="email"
+              autoComplete="username"
             />
-            <button type="submit" disabled={busy}>
-              {busy ? 'Sending…' : 'Email me a sign-in link'}
-            </button>
+            <input
+              type="password"
+              required
+              minLength={6}
+              placeholder="Password (at least 6 characters)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-label="Password for sync"
+              autoComplete="current-password"
+            />
+            <div className="row wrap">
+              <button type="submit" disabled={busy}>
+                {busy ? 'Please wait…' : 'Sign in'}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={(e) => {
+                  const form = e.currentTarget.form
+                  if (form?.reportValidity()) void run('create')
+                }}
+              >
+                Create account
+              </button>
+            </div>
           </form>
         </>
       )}
+      {notice && <p className="info">{notice}</p>}
       {error && <p className="error">{error}</p>}
     </section>
   )
