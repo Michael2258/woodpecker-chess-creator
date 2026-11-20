@@ -34,3 +34,17 @@ The Woodpecker is complete once a cycle is solved within one day, or after 7 cyc
 The app is hosted on Vercel, linked to this repository. Every push to `main` deploys to production,
 and every pull request gets its own preview URL. Vercel detects the Vite setup automatically
 (build command `npm run build`, output folder `dist`).
+
+## Passcode
+
+The deployed app is locked behind a passcode. `middleware.ts` runs on Vercel
+before every request and shows a passcode page until the right passcode is
+entered; then the browser stays unlocked for 180 days (an httpOnly, signed
+cookie). The passcode is stored only in the `APP_PASSCODE` environment
+variable on Vercel, never in this repository or in the app's JavaScript.
+
+- Set or change it: Vercel → project → Settings → Environment Variables →
+  `APP_PASSCODE`, then redeploy. Changing it signs out every device.
+- Lock this browser again: visit `/__gate/lock`.
+- If `APP_PASSCODE` isn't set, the deployed site stays closed.
+- `npm run dev` has no gate (middleware only runs on Vercel).

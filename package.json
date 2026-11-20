@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
+    "@vercel/functions": "^3.11.3",
     "chess.js": "^1.4.0",
     "dexie": "^4.4.7",
     "dexie-react-hooks": "^4.4.0",
